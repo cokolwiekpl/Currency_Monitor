@@ -87,6 +87,18 @@ For a 4.00 PLN threshold, **3.99 → 4.01** triggers an `above` alert. **4.01 �
 
 The first check compares the last two NBP publications. If both are already above the threshold, no alert is sent. NBP publishes reference rates on its own schedule.
 
+## Optional Uptime Kuma monitoring
+
+1. Open [Uptime Kuma](http://uptime.home) and select **Add New Monitor → Push**. Name it `Currency Monitor`.
+2. Set **Heartbeat Interval** to `3900` seconds for the default hourly checks and **Retries** to `0`. For another checking interval, allow extra time for the full cycle and network delays. Increase this margin if you add many alerts.
+3. Save the monitor and copy its full **Push URL**.
+4. In Portainer, add `UPTIME_KUMA_PUSH_URL` to the stack's environment variables, paste the URL, and redeploy. For local Compose, put it in `.env` and recreate the container.
+5. Select a notification channel in Kuma if you want failure alerts.
+
+Each completed cycle reports **Up** when all checks succeed or **Down** if any check fails, including Discord delivery. Kuma's ping value shows cycle duration in milliseconds. If the application stops or stalls, Kuma detects the missing heartbeat after its configured interval. The container must be able to reach `uptime.home` through your local DNS and network.
+
+Leave the variable empty or omit it to disable this integration. Push failures are logged without the URL or token, and currency monitoring continues. Preview, validation, and test-message commands send no heartbeat. `--once` reports its single monitoring cycle. [Push API details](https://github.com/louislam/uptime-kuma/wiki/Internal-API)
+
 ## Update or stop the application
 
 To update the application, open the stack in Portainer and select **Pull and redeploy**. Enable **Re-pull image** when offered.

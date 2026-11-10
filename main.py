@@ -12,9 +12,10 @@ import sys
 import time
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from http.client import HTTPException
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlparse
+from urllib.parse import parse_qsl, quote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from models import Config, Profile, Quote, Rule, as_decimal
@@ -406,6 +407,33 @@ def list_nbp() -> None:
             print(f"  {row['code']}")
 
 
+def send_kuma_heartbeat(success: bool, duration_seconds: float) -> None:
+    """Report a completed cycle without exposing credentials or affecting alerts."""
+    push_url = os.getenv("UPTIME_KUMA_PUSH_URL", "").strip()
+    if not push_url:
+        return
+    try:
+        parsed = urlparse(push_url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError("Invalid Push URL")
+        parameters = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+                      if key not in ("status", "msg", "ping")]
+        parameters.extend([
+            ("status", "up" if success else "down"),
+            ("msg", "All currency checks succeeded" if success else "Currency check failed; see application logs"),
+            ("ping", f"{duration_seconds * 1000:.2f}"),
+        ])
+        url = parsed._replace(query=urlencode(parameters), fragment="").geturl()
+        request = Request(url, headers={"Accept": "application/json", "User-Agent": USER_AGENT})
+        with urlopen(request, timeout=min(request_timeout(), 5)) as response:
+            result = json.load(response)
+        if not isinstance(result, dict) or result.get("ok") is not True:
+            raise ValueError("Push was not accepted")
+    except (OSError, ValueError, HTTPException):
+        # Exception messages and response bodies may contain the Push token.
+        log("WARNING: Uptime Kuma heartbeat could not be delivered. Check its URL and connectivity.")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Monitor currency thresholds from multiple sources and send Discord alerts")
     modes = parser.add_mutually_exclusive_group()
@@ -443,6 +471,7 @@ def main(argv: list[str] | None = None) -> int:
             state = load_state()
             log(f"Start: {len(cfg.profiles)} profiles, {len(cfg.sources)} sources, checking every {interval} seconds.")
             while True:
+                cycle_started = time.monotonic()
                 # Config reload each time; changes need no rebuilding.
                 try:
                     refreshed = load_config()
@@ -453,6 +482,7 @@ def main(argv: list[str] | None = None) -> int:
                 except (ValueError, OSError, json.JSONDecodeError) as exc:
                     log(f"Configuration error: {exc}")
                     ok = False
+                send_kuma_heartbeat(ok, time.monotonic() - cycle_started)
                 if args.once:
                     return 0 if ok else 1
                 time.sleep(interval)
