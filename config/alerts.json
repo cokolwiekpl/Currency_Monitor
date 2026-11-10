@@ -10,7 +10,7 @@
       "source": "nbp",
       "webhook_env": "DISCORD_WEBHOOK_PRIMARY",
       "alerts": [
-        {"id": "usd-above-4", "currency": "USD", "rate_type": "mid", "direction": "above", "threshold": "3.00"},
+        {"id": "usd-above-4", "currency": "USD", "rate_type": "mid", "direction": "above", "threshold": "4.00"},
         {"id": "eur-below-4-20", "currency": "EUR", "rate_type": "mid", "direction": "below", "threshold": "4.20"}
       ]
     }
