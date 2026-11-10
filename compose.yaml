@@ -1,0 +1,25 @@
+services:
+  currency-monitor:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      CONFIG_PATH: /app/config/alerts.json
+      STATE_PATH: /data/state.json
+    volumes:
+      - ./config:/app/config:ro
+      - monitor-state:/data
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  monitor-state:

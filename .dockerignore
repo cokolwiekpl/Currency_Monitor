@@ -1,0 +1,6 @@
+# Only application source is needed to build the image.
+**
+!Dockerfile
+!main.py
+!models.py
+!storage.py

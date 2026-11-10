@@ -1,0 +1,36 @@
+{
+  "sources": {
+    "nbp": {"type": "nbp"},
+    "example_bank": {
+      "type": "json_api",
+      "label": "Example bank",
+      "url": "https://example.com/api/rates",
+      "rates_path": "data.rates",
+      "currency_path": "currency",
+      "timestamp_path": "data.updated_at",
+      "price_paths": {
+        "buy": "buy",
+        "sell": "sell"
+      }
+    }
+  },
+  "profiles": [
+    {
+      "id": "primary",
+      "source": "nbp",
+      "webhook_env": "DISCORD_WEBHOOK_PRIMARY",
+      "alerts": [
+        {"id": "usd-4", "currency": "USD", "rate_type": "mid", "direction": "above", "threshold": "4.00"}
+      ]
+    },
+    {
+      "id": "secondary",
+      "source": "example_bank",
+      "webhook_env": "DISCORD_WEBHOOK_SECONDARY",
+      "alerts": [
+        {"id": "eur-buy-target", "currency": "EUR", "rate_type": "sell", "direction": "below", "threshold": "4.25"},
+        {"id": "usd-sell-target", "currency": "USD", "rate_type": "buy", "direction": "above", "threshold": "4.00"}
+      ]
+    }
+  ]
+}
