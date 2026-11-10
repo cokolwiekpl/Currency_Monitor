@@ -52,8 +52,26 @@ def require_path(path, desc: str) -> None:
 
 
 def load_config(path: Path | None = None) -> Config:
-    with (path or CONFIG_PATH).open(encoding="utf-8") as fp:
-        raw = json.load(fp, parse_float=Decimal)
+    environment_config = os.getenv("ALERTS_CONFIG_JSON")
+    if environment_config is not None:
+        try:
+            raw = json.loads(environment_config, parse_float=Decimal)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"ALERTS_CONFIG_JSON contains invalid JSON at line {exc.lineno}, column {exc.colno}.") from None
+    else:
+        config_path = path or CONFIG_PATH
+        try:
+            with config_path.open(encoding="utf-8") as fp:
+                raw = json.load(fp, parse_float=Decimal)
+        except FileNotFoundError:
+            raise ValueError(f"Configuration file not found: {config_path}") from None
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Configuration file contains invalid JSON at line {exc.lineno}, column {exc.colno}.") from None
+    return validate_config(raw)
+
+
+def validate_config(raw) -> Config:
+    """Validate file and environment configuration through the same rules."""
     if not isinstance(raw, dict):
         raise ValueError("Configuration must be a JSON object.")
     sources = raw.get("sources")
@@ -217,6 +235,9 @@ def fetch_json_snapshot(source_id: str, src: dict, currency: str, rate_type: str
             raise ValueError(f"Source {source_id}: HTTP {exc.code} while fetching rates.") from None
         except (URLError, OSError):
             raise ValueError(f"Source {source_id}: network error while fetching rates.") from None
+        except ValueError:
+            # urllib can include a secret header value in request validation errors.
+            raise ValueError(f"Source {source_id}: invalid HTTP request or JSON response.") from None
     payload = cache[cache_key]
     rows = get_path(payload, src["rates_path"])
     if isinstance(rows, dict):
@@ -424,7 +445,10 @@ def main(argv: list[str] | None = None) -> int:
             while True:
                 # Config reload each time; changes need no rebuilding.
                 try:
-                    cfg = load_config()
+                    refreshed = load_config()
+                    if refreshed != cfg:
+                        log(f"Configuration reloaded: {len(refreshed.profiles)} profiles, {len(refreshed.sources)} sources.")
+                    cfg = refreshed
                     ok = check_once(cfg, state)
                 except (ValueError, OSError, json.JSONDecodeError) as exc:
                     log(f"Configuration error: {exc}")

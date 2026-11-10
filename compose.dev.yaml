@@ -1,0 +1,10 @@
+# Use with compose.yaml for local builds and live JSON configuration edits.
+services:
+  currency-monitor:
+    image: currency-monitor:dev
+    build: .
+    pull_policy: never
+    env_file:
+      - .env
+    volumes:
+      - ./config:/app/config:ro

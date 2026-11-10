@@ -4,3 +4,6 @@
 !main.py
 !models.py
 !storage.py
+!config/
+config/**
+!config/alerts.json
